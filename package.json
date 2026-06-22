@@ -1,0 +1,15 @@
+{
+  "name": "tradingview-okx-cloudflare-bot",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "dev": "wrangler dev",
+    "publish": "wrangler publish",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.103.0",
+    "typescript": "^6.0.3"
+  }
+}

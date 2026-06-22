@@ -1,0 +1,27 @@
+name = "tradingview-okx-cloudflare-bot"
+compatibility_date = "2026-06-21"
+type = "javascript"
+
+# Environment variables (not sensitive)
+vars = { WEBHOOK_ENDPOINT = "/tradingview-webhook", OKX_API_URL = "https://openapi.okx.com", ALLOCATION_CONFIG = "{\"SOL-USDT\":33,\"ETH-USDT\":33,\"ZEC-USDT\":33}" }
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "okx-trading-bot"
+database_id = ""
+
+# Scheduled jobs (cron triggers)
+[triggers]
+crons = ["55 * * * *"]
+
+# SECRETS (use 'wrangler secret put' for these):
+# - OKX_API_KEY
+# - OKX_API_SECRET
+# - OKX_PASSPHRASE
+# - WEBHOOK_SECRET (sensitive: Secret token for TradingView webhook protection)
+
+[observability.logs]
+enabled = true
+invocation_logs = false
+
