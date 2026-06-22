@@ -1,6 +1,7 @@
 name = "tradingview-okx-cloudflare-bot"
+main = "src/index.ts"
 compatibility_date = "2026-06-21"
-type = "javascript"
+compatibility_flags = ["nodejs_compat"]
 
 # Environment variables (not sensitive)
 vars = { WEBHOOK_ENDPOINT = "/tradingview-webhook", OKX_API_URL = "https://openapi.okx.com", ALLOCATION_CONFIG = "{\"SOL-USDT\":33,\"ETH-USDT\":33,\"ZEC-USDT\":33}" }
