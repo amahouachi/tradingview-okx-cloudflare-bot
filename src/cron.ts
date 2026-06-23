@@ -8,7 +8,7 @@ export async function handleCron(env: Env): Promise<void> {
 
     console.log('[CRON] Starting trade reconciliation...');
     const allOrdersRes = await okx.getFilledOrders();
-    console.log(`[CRON] Fetched ${allOrdersRes && allOrdersRes.data ? allOrdersRes.data.length : 0} filled orders from OKX`);
+    console.log(`[CRON] Fetched ${allOrdersRes && allOrdersRes.data ? allOrdersRes.data.length : 0} filled orders`);
     const orders = (allOrdersRes && allOrdersRes.data) ? allOrdersRes.data : [];
 
     for (const o of orders) {
