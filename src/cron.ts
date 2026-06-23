@@ -6,7 +6,9 @@ export async function handleCron(env: Env): Promise<void> {
     const okx = new OKXClient({ OKX_API_KEY: env.OKX_API_KEY, OKX_API_SECRET: env.OKX_API_SECRET, OKX_PASSPHRASE: env.OKX_PASSPHRASE });
     const db = new Database(env.DB);
 
+    console.log('[CRON] Starting trade reconciliation...');
     const allOrdersRes = await okx.getFilledOrders();
+    console.log(`[CRON] Fetched ${allOrdersRes && allOrdersRes.data ? allOrdersRes.data.length : 0} filled orders from OKX`);
     const orders = (allOrdersRes && allOrdersRes.data) ? allOrdersRes.data : [];
 
     for (const o of orders) {
