@@ -131,7 +131,7 @@ export async function processSignal(env: Env, signal: any, allocation: Allocatio
 
   try {
     debug(env, 'Placing order', { instId, action, price, qty: roundedQty });
-    const order = await okx.placeLimitOrder(instId, action === 'buy' ? 'buy' : 'sell', price, roundedQty, `${instId}_${action}_${Date.now()}`);
+    const order = await okx.placeLimitOrder(instId, action === 'buy' ? 'buy' : 'sell', price, roundedQty);
     debug(env, 'Order response', { order });
     
     // Check if OKX returned an error (code !== '0')
