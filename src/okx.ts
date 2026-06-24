@@ -61,6 +61,10 @@ export class OKXClient {
     return this.request('GET', '/api/v5/account/balance');
   }
 
+  getInstruments(instId: string) {
+    return this.request('GET', '/api/v5/public/instruments', { instType: 'SPOT', instId });
+  }
+
   getOpenOrders(instId?: string) {
     const params: Record<string, string> = { instType: 'SPOT' };
     if (instId) params.instId = instId;
@@ -75,13 +79,18 @@ export class OKXClient {
   }
 
   placeLimitOrder(instId: string, side: 'buy' | 'sell', price: string | number, size: string | number, clientOid?: string) {
+    // Convert price and size to strings with appropriate precision
+    // OKX expects strings, we'll format to 8 decimals (should work for most instruments)
+    const priceStr = Number(price).toFixed(8).replace(/\.?0+$/, '');
+    const sizeStr = Number(size).toFixed(8).replace(/\.?0+$/, '');
+    
     const data: any = {
       instId,
       tdMode: 'cash',
       side,
       ordType: 'limit',
-      px: String(price),
-      sz: String(size),
+      px: priceStr,
+      sz: sizeStr,
     };
     if (clientOid) data.clOrdId = clientOid;
     return this.request('POST', '/api/v5/trade/order', undefined, data);

@@ -15,7 +15,14 @@ export async function processSignal(env: Env, signal: any, allocation: Allocatio
     const openOrders = await okx.getOpenOrders(instId);
     if (openOrders && openOrders.data) {
       for (const o of openOrders.data) {
-        try { await okx.cancelOrder(o.instId, o.ordId); } catch (e) { console.error(`Failed to cancel order ${o.ordId} for ${o.instId}:`, e); }
+        try {
+          const cancelRes = await okx.cancelOrder(o.instId, o.ordId);
+          if (cancelRes.code && cancelRes.code !== '0') {
+            console.error(`Failed to cancel order ${o.ordId}: ${cancelRes.msg || cancelRes.code}`);
+          }
+        } catch (e) {
+          console.error(`Failed to cancel order ${o.ordId} for ${o.instId}:`, e);
+        }
       }
     }
     return { success: true, symbol: instId, action: 'cancel' };
@@ -26,7 +33,14 @@ export async function processSignal(env: Env, signal: any, allocation: Allocatio
     const existing = await okx.getOpenOrders(instId);
     if (existing && existing.data) {
       for (const o of existing.data) {
-        try { await okx.cancelOrder(o.instId, o.ordId); } catch (e) { console.error(`Failed to cancel existing order ${o.ordId} for ${o.instId}:`, e); }
+        try {
+          const cancelRes = await okx.cancelOrder(o.instId, o.ordId);
+          if (cancelRes.code && cancelRes.code !== '0') {
+            debug(env, `Failed to cancel existing order ${o.ordId}: ${cancelRes.msg}`);
+          }
+        } catch (e) {
+          console.error(`Failed to cancel existing order ${o.ordId} for ${o.instId}:`, e);
+        }
       }
     }
   } catch (e) {
@@ -89,11 +103,45 @@ export async function processSignal(env: Env, signal: any, allocation: Allocatio
     return { success: false, symbol: instId, action, error: 'Insufficient capital' };
   }
 
+  // Fetch instrument specs to get proper precision
+  let instSpecs: any = null;
   try {
-    debug(env, 'Placing order', { instId, action, price, qty });
-    const order = await okx.placeLimitOrder(instId, action === 'buy' ? 'buy' : 'sell', price, qty, `${instId}_${action}_${Date.now()}`);
-    debug(env, 'Order placed', { order });
-    return order;
+    debug(env, 'Fetching instrument specs');
+    const specRes = await okx.getInstruments(instId);
+    if (specRes && specRes.data && specRes.data.length > 0) {
+      instSpecs = specRes.data[0];
+      debug(env, 'Instrument specs', { minSz: instSpecs.minSz, lotSz: instSpecs.lotSz, tickSz: instSpecs.tickSz });
+    }
+  } catch (e) {
+    console.warn(`Failed to fetch instrument specs for ${instId}:`, e);
+  }
+
+  // Round qty to lot size precision (if available)
+  let roundedQty = qty;
+  if (instSpecs && instSpecs.lotSz) {
+    const lotSize = parseFloat(instSpecs.lotSz);
+    roundedQty = Math.floor(qty / lotSize) * lotSize;
+    debug(env, 'Qty rounded to lot size', { original: qty, lotSz: instSpecs.lotSz, rounded: roundedQty });
+  }
+
+  if (roundedQty <= 0) {
+    debug(env, 'Rounded quantity too small', { roundedQty, minSz: instSpecs?.minSz });
+    return { success: false, symbol: instId, action, error: `Order size too small (minimum: ${instSpecs?.minSz})` };
+  }
+
+  try {
+    debug(env, 'Placing order', { instId, action, price, qty: roundedQty });
+    const order = await okx.placeLimitOrder(instId, action === 'buy' ? 'buy' : 'sell', price, roundedQty, `${instId}_${action}_${Date.now()}`);
+    debug(env, 'Order response', { order });
+    
+    // Check if OKX returned an error (code !== '0')
+    if (order.code && order.code !== '0') {
+      console.error(`OKX API error for ${action} order: ${order.msg || order.code}`);
+      return { success: false, symbol: instId, action, error: `OKX error: ${order.msg || order.code}` };
+    }
+    
+    debug(env, 'Order placed successfully');
+    return { success: true, ...order };
   } catch (e) {
     console.error(`Failed to place ${action} order for ${instId} @ ${price} qty ${qty}:`, e);
     return { success: false, symbol: instId, action, error: String(e) };
