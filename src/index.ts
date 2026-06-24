@@ -2,6 +2,7 @@ import { processSignal } from './processor';
 import { handleCron } from './cron';
 import { Config } from './config';
 import { Env } from './db';
+import { debug } from './debug';
 
 interface ExecutionContext {
   waitUntil(promise: Promise<any>): void;
@@ -9,15 +10,21 @@ interface ExecutionContext {
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    debug(env, 'Webhook request received', { method: request.method, url: request.url });
     if (request.method !== 'POST') return new Response('Method not allowed', { status: 405 });
 
     const url = new URL(request.url);
     const config = new Config(env);
 
-    if (url.pathname !== config.webhookEndpoint) return new Response('Not found', { status: 404 });
+    debug(env, 'Config loaded', { webhookEndpoint: config.webhookEndpoint, pathname: url.pathname });
+    if (url.pathname !== config.webhookEndpoint) {
+      debug(env, 'Path mismatch', { expected: config.webhookEndpoint, got: url.pathname });
+      return new Response('Not found', { status: 404 });
+    }
 
     const token = url.searchParams.get('token');
     const webhookSecret = env.WEBHOOK_SECRET;
+    debug(env, 'Token validation', { hasSecret: !!webhookSecret, tokenMatch: token === webhookSecret });
     if (!webhookSecret || token !== webhookSecret) {
       console.error('Webhook authentication failed');
       return new Response('Unauthorized', { status: 401 });
@@ -32,6 +39,7 @@ export default {
     let signal: any;
     try {
       signal = await request.json();
+      debug(env, 'Request parsed', { signal });
     } catch (e) {
       console.error('Failed to parse request body:', e);
       return new Response('OK', { status: 200 });
@@ -39,6 +47,7 @@ export default {
 
     // Minimal validation
     if (!signal || !signal.action || !signal.symbol) {
+      debug(env, 'Invalid signal structure', { signal });
       console.error('Invalid signal');
       return new Response('OK', { status: 200 });
     }

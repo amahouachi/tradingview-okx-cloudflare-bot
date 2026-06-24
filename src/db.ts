@@ -125,4 +125,5 @@ export interface Env {
   WEBHOOK_ENDPOINT?: string;
   WEBHOOK_SECRET?: string;
   ALLOCATION_CONFIG?: string;
+  DEBUG?: string;
 }
