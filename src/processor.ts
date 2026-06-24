@@ -49,13 +49,18 @@ export async function processSignal(env: Env, signal: any, allocation: Allocatio
 
   // Determine quote currency from instId (e.g. BTC-USDT -> USDT)
   const parts = String(instId).includes('-') ? String(instId).split('-') : String(instId).split('/');
+  const baseCcy = parts[0];
   const quoteCcy = parts.length > 1 ? parts[1] : parts[0];
-  debug(env, 'Quote currency extracted', { quoteCcy, parts });
+  debug(env, 'Currencies extracted', { baseCcy, quoteCcy, parts });
 
-  const allocationPercent = allocation[instId] || allocation[parts[0]] || 0;
-  debug(env, 'Allocation lookup', { instId, baseCcy: parts[0], allocationPercent, available_keys: Object.keys(allocation) });
+  // For buy: use quote currency; for sell: use base currency
+  const targetCcy = action === 'buy' ? quoteCcy : baseCcy;
+  debug(env, 'Target currency for balance check', { action, targetCcy });
+
+  const allocationPercent = allocation[instId] || allocation[baseCcy] || 0;
+  debug(env, 'Allocation lookup', { instId, baseCcy, allocationPercent, available_keys: Object.keys(allocation) });
   if (!allocationPercent) {
-    debug(env, 'No allocation configured for', { instId, parts });
+    debug(env, 'No allocation configured for', { instId, baseCcy });
     return { success: false, symbol: instId, action, error: 'No allocation configured' };
   }
 
@@ -64,26 +69,24 @@ export async function processSignal(env: Env, signal: any, allocation: Allocatio
     return { success: false, symbol: instId, action, error: 'Invalid price: must be positive' };
   }
 
-  // Determine quote balance for that currency
-  let quoteBalance = 0;
+  // Determine balance for the target currency
+  let balance = 0;
   try {
-    debug(env, 'Fetching balance from OKX');
+    debug(env, 'Fetching balance from OKX for', { targetCcy });
     const balRes = await okx.getBalance();
     debug(env, 'Balance response', { balRes });
     if (balRes && balRes.data) {
-      // OKX returns array of balances; search for matching currency code
       for (const entry of balRes.data) {
-        // entry may represent a currency bucket or have nested details
-        if (entry.ccy && String(entry.ccy).toUpperCase() === String(quoteCcy).toUpperCase()) {
-          quoteBalance = parseFloat(entry.availBal || entry.available || entry.availEq || 0) || 0;
-          debug(env, `Found balance for ${quoteCcy}`, { quoteBalance, entry });
+        if (entry.ccy && String(entry.ccy).toUpperCase() === String(targetCcy).toUpperCase()) {
+          balance = parseFloat(entry.availBal || entry.available || entry.availEq || 0) || 0;
+          debug(env, `Found balance for ${targetCcy}`, { balance, entry });
           break;
         }
         if (entry.details) {
           for (const d of entry.details) {
-            if (d.ccy && String(d.ccy).toUpperCase() === String(quoteCcy).toUpperCase()) {
-              quoteBalance = parseFloat(d.availBal || d.availEq || 0) || 0;
-              debug(env, `Found balance for ${quoteCcy} in details`, { quoteBalance, detail: d });
+            if (d.ccy && String(d.ccy).toUpperCase() === String(targetCcy).toUpperCase()) {
+              balance = parseFloat(d.availBal || d.availEq || 0) || 0;
+              debug(env, `Found balance for ${targetCcy} in details`, { balance, detail: d });
               break;
             }
           }
@@ -95,12 +98,20 @@ export async function processSignal(env: Env, signal: any, allocation: Allocatio
     return { success: false, symbol: instId, action, error: `Failed to fetch balance: ${e}` };
   }
 
-  debug(env, 'Balance calculation', { quoteCcy, quoteBalance, allocationPercent, price });
-  const qty = (quoteBalance * allocationPercent) / 100 / price;
-  debug(env, 'Calculated quantity', { qty });
+  // Calculate quantity based on action
+  let qty: number;
+  if (action === 'buy') {
+    // For buy: qty = (USDT balance * allocation%) / 100 / price
+    qty = (balance * allocationPercent) / 100 / price;
+    debug(env, 'Buy quantity calculation', { balance, allocationPercent, price, qty });
+  } else {
+    // For sell: use entire available balance (100%)
+    qty = balance;
+    debug(env, 'Sell quantity calculation - using full balance', { balance, qty });
+  }
   if (qty <= 0) {
-    debug(env, 'Insufficient capital', { qty, quoteBalance, allocationPercent });
-    return { success: false, symbol: instId, action, error: 'Insufficient capital' };
+    debug(env, 'Insufficient balance', { qty, balance, allocationPercent });
+    return { success: false, symbol: instId, action, error: 'Insufficient balance' };
   }
 
   // Fetch instrument specs to get proper precision
@@ -126,7 +137,7 @@ export async function processSignal(env: Env, signal: any, allocation: Allocatio
 
   if (roundedQty <= 0) {
     debug(env, 'Rounded quantity too small', { roundedQty, minSz: instSpecs?.minSz });
-    return { success: false, symbol: instId, action, error: `Order size too small (minimum: ${instSpecs?.minSz})` };
+    return { success: false, symbol: instId, action, error: `Order size below minimum (minimum: ${instSpecs?.minSz})` };
   }
 
   try {
