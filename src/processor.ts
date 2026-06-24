@@ -57,7 +57,8 @@ export async function processSignal(env: Env, signal: any, allocation: Allocatio
       }
     }
   } catch (e) {
-    console.warn('Failed to fetch balance from OKX, proceeding with zero balance:', e);
+    console.error('Failed to fetch balance from OKX:', e);
+    return { success: false, symbol: instId, action, error: `Failed to fetch balance: ${e}` };
   }
 
   const allocationPercent = allocation[instId] || allocation[parts[0]] || 0;
