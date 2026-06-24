@@ -4,7 +4,7 @@ compatibility_date = "2026-06-21"
 compatibility_flags = ["nodejs_compat"]
 
 # Environment variables (not sensitive)
-vars = { WEBHOOK_ENDPOINT = "/tradingview-webhook", OKX_API_URL = "https://openapi.okx.com", ALLOCATION_CONFIG = "{\"SOL-USDT\":5,\"ETH-USDT\":33,\"ZEC-USDT\":33}", DEBUG = "true" }
+vars = { WEBHOOK_ENDPOINT = "/tradingview-webhook", OKX_API_URL = "https://openapi.okx.com", ALLOCATION_CONFIG = "{\"SOL-USDT\":40,\"ETH-USDT\":35,\"BTC-USDT\":24}", DEBUG = "false" }
 
 # D1 Database binding
 [[d1_databases]]
